@@ -1424,7 +1424,11 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
     return [[controller getCurrentUserSessionTokenAsync] continueWithBlock:^id(BFTask *task) {
         NSString *sessionToken = task.result;
         return [toAwait continueAsyncWithBlock:^id(BFTask *task) {
-            return [[[self class] objectController] deleteObjectAsync:self withSessionToken:sessionToken];
+            return [[[[self class] objectController] deleteObjectAsync:self withSessionToken:sessionToken] continueWithBlock:^(BFTask *task) {
+                id result = task.result;
+                [self.saveDelegate invoke:result error:task.error];
+                return task;
+            }];
         }];
     }];
 }
@@ -1885,7 +1889,11 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
 
 - (BFTask *)saveInBackground {
     return [self.taskQueue enqueue:^BFTask *(BFTask *toAwait) {
-        return [self saveAsync:toAwait];
+        return [[self saveAsync:toAwait] continueWithBlock:^(BFTask *task) {
+            id result = task.result;
+            [self.saveDelegate invoke:result error:task.error];
+            return result;
+        }];
     }];
 }
 
@@ -1895,9 +1903,11 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
 
 - (BFTask *)saveEventually {
     return [[self _enqueueSaveEventuallyWithChildren:YES] continueWithSuccessBlock:^id(BFTask *task) {
+        id result = task.result;
+        [self.saveDelegate invoke:result error:task.error];
         // The result of the previous task will be an instance of BFTask.
         // Returning it here will trigger the whole task stack become an actual save task.
-        return task.result;
+        return result;
     }];
 }
 
@@ -1909,6 +1919,8 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
     return [[[_eventuallyTaskQueue enqueue:^BFTask *(BFTask *toAwait) {
         NSString *sessionToken = [PFUser currentSessionToken];
         return [[toAwait continueAsyncWithBlock:^id(BFTask *task) {
+            id result = task.result;
+            [self.saveDelegate invoke:result error:task.error];
             return [self _validateDeleteAsync];
         }] continueWithSuccessBlock:^id(BFTask *task) {
             @synchronized (lock) {

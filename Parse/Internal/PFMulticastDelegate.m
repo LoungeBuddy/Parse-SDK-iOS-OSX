@@ -10,7 +10,8 @@
 #import "PFMulticastDelegate.h"
 
 @interface PFMulticastDelegate () {
-    NSMutableArray *_callbacks;
+    NSPointerArray *_callbacks;
+    NSObject *_lock;
 }
 
 @end
@@ -21,27 +22,50 @@
     self = [super init];
     if (!self) return nil;
 
-    _callbacks = [[NSMutableArray alloc] init];
+    _callbacks = [NSPointerArray strongObjectsPointerArray];
+    _lock = [[NSObject alloc] init];
 
     return self;
 }
 
-- (void)subscribe:(void(^)(id result, NSError *error))block {
-    [_callbacks addObject:block];
+- (void)dealloc {
+    @synchronized (_lock) {
+        [self clear];
+    }
 }
 
-- (void)unsubscribe:(void(^)(id result, NSError *error))block {
-    [_callbacks removeObject:block];
+- (void)subscribe:(PFMulticastDelegateCallback)block {
+    @synchronized (_lock) {
+        [_callbacks addPointer:(__bridge void *)[block copy]];
+    }
+}
+
+- (void)unsubscribe:(PFMulticastDelegateCallback)block {
+    @synchronized (_lock) {
+        for (NSUInteger i = 0; i < _callbacks.count; i++) {
+            void *subscriber = [_callbacks pointerAtIndex:i];
+            if (subscriber != NULL && subscriber == block) {
+                [_callbacks removePointerAtIndex:i];
+            }
+        }
+        [_callbacks compact];
+    }
 }
 
 - (void)invoke:(id)result error:(NSError *)error {
-    NSArray *callbackCopy = [_callbacks copy];
-    for (void (^block)(id result, NSError *error) in callbackCopy) {
-        block(result, error);
+    @synchronized (_lock) {
+        for (PFMulticastDelegateCallback block in _callbacks) {
+            block(result, error);
+        }
     }
 }
 - (void)clear {
-    [_callbacks removeAllObjects];
+    @synchronized (_lock) {
+        for (NSUInteger i = 0; i < _callbacks.count; i++) {
+            [_callbacks removePointerAtIndex:i];
+        }
+        [_callbacks compact];
+    }
 }
 
 @end

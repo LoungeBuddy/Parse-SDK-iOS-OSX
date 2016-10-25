@@ -276,8 +276,12 @@
 - (NSString *)displayClassName;
 - (NSString *)displayObjectId;
 
-- (void)registerSaveListener:(void (^)(id result, NSError *error))callback;
-- (void)unregisterSaveListener:(void (^)(id result, NSError *error))callback;
+typedef PFMulticastDelegateCallback _PFSaveListenerCallback;
+@property (nonatomic, class, readonly) NSMutableDictionary <NSUUID *, _PFSaveListenerCallback> *globalSaveListeners;
++ (id)registerGlobalSaveListener:(_PFSaveListenerCallback)callback;
++ (void)unregisterGlobalSaveListener:(id)listener;
+- (void)registerSaveListener:(_PFSaveListenerCallback)callback;
+- (void)unregisterSaveListener:(_PFSaveListenerCallback)callback;
 - (PFACL *)ACLWithoutCopying;
 
 ///--------------------------------------

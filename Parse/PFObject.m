@@ -1498,7 +1498,26 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
     return self._state.parseClassName;
 }
 
-- (void)registerSaveListener:(void (^)(id result, NSError *error))callback {
++ (NSMutableDictionary <NSUUID *, PFMulticastDelegateCallback> *)globalSaveListeners {
+    static NSMutableDictionary *globalSaveListeners = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        globalSaveListeners = [NSMutableDictionary dictionary];
+    });
+    return globalSaveListeners;
+}
+
++ (id)registerGlobalSaveListener:(PFMulticastDelegateCallback)callback {
+    NSUUID *UUID = [NSUUID UUID];
+    self.globalSaveListeners[UUID] = callback;
+    return UUID;
+}
+
++ (void)unregisterGlobalSaveListener:(id)listener {
+    [self.globalSaveListeners removeObjectForKey:listener];
+}
+
+- (void)registerSaveListener:(PFMulticastDelegateCallback)callback {
     @synchronized (lock) {
         if (!self.saveDelegate) {
             self.saveDelegate = [[PFMulticastDelegate alloc] init];
@@ -1507,7 +1526,7 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
     }
 }
 
-- (void)unregisterSaveListener:(void (^)(id result, NSError *error))callback {
+- (void)unregisterSaveListener:(PFMulticastDelegateCallback)callback {
     @synchronized (lock) {
         if (!self.saveDelegate) {
             self.saveDelegate = [[PFMulticastDelegate alloc] init];
@@ -1590,6 +1609,12 @@ static void PFObjectAssertValueIsKindOfValidClass(id object) {
         dirty = YES;
         [self setDefaultValues];
     }
+
+    @weakify(self);
+    [[PFObject.globalSaveListeners copy] enumerateKeysAndObjectsUsingBlock:^(NSUUID *key, _PFSaveListenerCallback callback, BOOL *stop) {
+        @strongify(self);
+        [self registerSaveListener:callback];
+    }];
 
     return self;
 }

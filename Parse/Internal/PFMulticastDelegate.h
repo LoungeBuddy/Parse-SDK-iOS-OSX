@@ -9,6 +9,8 @@
 
 #import <Foundation/Foundation.h>
 
+typedef void (^PFMulticastDelegateCallback)(id result, NSError *error);
+
 /**
  Represents an event that can be subscribed to by multiple observers.
  */
@@ -20,8 +22,8 @@
  Important: if you ever plan to be able to unsubscribe the block, you must copy the block
  before passing it to subscribe, and use the same instance for unsubscribe.
  */
-- (void)subscribe:(void(^)(id result, NSError *error))block;
-- (void)unsubscribe:(void(^)(id result, NSError *error))block;
+- (void)subscribe:(PFMulticastDelegateCallback)block;
+- (void)unsubscribe:(PFMulticastDelegateCallback)block;
 - (void)invoke:(id)result error:(NSError *)error;
 - (void)clear;
 
